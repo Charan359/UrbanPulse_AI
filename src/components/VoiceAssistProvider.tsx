@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { speak, stopSpeaking, startListening, stopListening, VOICE_LANGUAGES } from '@/lib/voice';
+import { speak, speakDelayed, stopSpeaking, startListening, stopListening, VOICE_LANGUAGES } from '@/lib/voice';
 import { matchCommand, extractDestination, PAGE_ANNOUNCEMENTS } from '@/lib/voiceCommands';
 
 interface VoiceAssistContextType {
@@ -31,7 +31,7 @@ const VoiceAssistContext = createContext<VoiceAssistContextType>({
 export const useVoiceAssist = () => useContext(VoiceAssistContext);
 
 export function VoiceAssistProvider({ children }: { children: React.ReactNode }) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -43,49 +43,68 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
   const [pendingDestination, setPendingDestination] = useState<string | null>(null);
   const [welcomed, setWelcomed] = useState(false);
   const prevPath = useRef(location.pathname);
+  const enabledRef = useRef(enabled);
+
+  // Keep ref in sync
+  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
 
   // Auto-enable for visually impaired users
   useEffect(() => {
-    if (profile?.is_visually_impaired) {
+    if (profile?.is_visually_impaired && user) {
       setEnabled(true);
     }
-  }, [profile]);
+  }, [profile, user]);
 
-  // Welcome greeting after login (once)
+  // Voice welcome greeting — fires when enabled + profile loaded
   useEffect(() => {
-    if (enabled && profile?.is_visually_impaired && !welcomed) {
-      setWelcomed(true);
-      setTimeout(() => {
-        announce(`Welcome to UrbanPulse AI, ${profile.full_name || 'friend'}. I am your voice assistant. Where are you planning to go today?`);
-        // Auto-start listening after greeting finishes
-        setTimeout(() => startVoiceInput(), 4000);
-      }, 1500);
-    }
+    if (!enabled || !profile || welcomed) return;
+    if (!profile.is_visually_impaired) return;
+
+    setWelcomed(true);
+    const name = profile.full_name || 'friend';
+
+    // Use speakDelayed to ensure browser voices are loaded
+    speakDelayed(
+      `Welcome to UrbanPulse AI, ${name}. I am your voice assistant. Where are you planning to go today?`,
+      1500,
+      voiceLang
+    ).then(() => {
+      // Auto-start listening after welcome finishes
+      if (enabledRef.current) {
+        setTimeout(() => startVoiceInput(), 500);
+      }
+    });
   }, [enabled, profile, welcomed]);
 
   // Page change announcements
   useEffect(() => {
     if (!enabled) return;
-    if (location.pathname !== prevPath.current) {
-      prevPath.current = location.pathname;
-      const msg = PAGE_ANNOUNCEMENTS[location.pathname];
+    const newPath = location.pathname;
+    if (newPath !== prevPath.current) {
+      prevPath.current = newPath;
+      const msg = PAGE_ANNOUNCEMENTS[newPath];
       if (msg) {
-        setTimeout(() => announce(msg), 600);
+        speakDelayed(msg, 800, voiceLang);
       }
     }
-  }, [location.pathname, enabled]);
+  }, [location.pathname, enabled, voiceLang]);
 
+  // Core announce function — always speaks when enabled
   const announce = useCallback((text: string) => {
-    if (!enabled && !profile?.is_visually_impaired) return;
     setLastUtterance(text);
     setSpeaking(true);
     const utterance = speak(text, voiceLang || 'en-IN');
     if (utterance) {
-      utterance.onend = () => setSpeaking(false);
+      const origOnEnd = utterance.onend;
+      utterance.onend = (ev) => {
+        setSpeaking(false);
+        if (typeof origOnEnd === 'function') origOnEnd.call(utterance, ev);
+      };
     } else {
-      setSpeaking(false);
+      // Fallback — try speakDelayed
+      speakDelayed(text, 300, voiceLang).then(() => setSpeaking(false));
     }
-  }, [enabled, voiceLang, profile]);
+  }, [voiceLang]);
 
   const handleTranscript = useCallback((transcript: string) => {
     // Check for voice commands first
@@ -102,11 +121,11 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
     // Check for destination confirmation
     if (pendingDestination) {
       const lower = transcript.toLowerCase();
-      if (lower.includes('yes') || lower.includes('confirm') || lower.includes('okay') || lower.includes('sure')) {
+      if (lower.includes('yes') || lower.includes('confirm') || lower.includes('okay') || lower.includes('sure') || lower.includes('haan') || lower.includes('ha')) {
         confirmDestination();
         return;
       }
-      if (lower.includes('no') || lower.includes('cancel') || lower.includes('wrong')) {
+      if (lower.includes('no') || lower.includes('cancel') || lower.includes('wrong') || lower.includes('nahi')) {
         rejectDestination();
         return;
       }
@@ -117,19 +136,21 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
     if (dest) {
       setPendingDestination(dest);
       announce(`You want to go to ${dest}. Should I find the safest and most accessible route? Say yes or no.`);
-      setTimeout(() => startVoiceInput(), 3500);
+      setTimeout(() => {
+        if (enabledRef.current) startVoiceInput();
+      }, 4000);
       return;
     }
 
-    // Fallback — send to AI assistant or announce
-    announce(`I heard: ${transcript}. Try saying 'go to' followed by a place name, or say 'help' for options.`);
+    // Fallback
+    announce(`I heard: ${transcript}. Try saying go to followed by a place name, or say help for options.`);
   }, [pendingDestination, lastUtterance, navigate, announce]);
 
   const startVoiceInput = useCallback(() => {
     if (listening) return;
     stopSpeaking();
     setListening(true);
-    startListening({
+    const started = startListening({
       lang: voiceLang,
       continuous: false,
       onResult: (transcript, isFinal) => {
@@ -146,7 +167,8 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
       },
       onEnd: () => setListening(false),
     });
-  }, [listening, voiceLang, handleTranscript]);
+    if (!started) setListening(false);
+  }, [listening, voiceLang, handleTranscript, announce]);
 
   const stopVoiceInput = useCallback(() => {
     stopListening();
@@ -156,7 +178,6 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
   const confirmDestination = useCallback(() => {
     if (!pendingDestination) return;
     announce(`Finding the best accessible route to ${pendingDestination}. Please wait.`);
-    // Navigate to routes page with destination
     const dest = pendingDestination;
     setPendingDestination(null);
     navigate('/routes', { state: { voiceDestination: dest } });
@@ -165,7 +186,9 @@ export function VoiceAssistProvider({ children }: { children: React.ReactNode })
   const rejectDestination = useCallback(() => {
     setPendingDestination(null);
     announce('Okay, tell me the correct destination. Where do you want to go?');
-    setTimeout(() => startVoiceInput(), 2500);
+    setTimeout(() => {
+      if (enabledRef.current) startVoiceInput();
+    }, 3000);
   }, [announce, startVoiceInput]);
 
   return (

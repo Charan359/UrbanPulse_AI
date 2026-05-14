@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 import { getUserProfile, type UserProfile } from '@/lib/database';
-import { speak } from '@/lib/voice';
 
 interface AuthContextType {
   user: User | null;
@@ -27,7 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [greeted, setGreeted] = useState(false);
 
   const loadProfile = async (userId: string) => {
     try {
@@ -56,14 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const p = await loadProfile(session.user.id);
-        // Voice greeting for visually impaired users (only once per session)
-        if (p?.is_visually_impaired && !greeted) {
-          setGreeted(true);
-          setTimeout(() => {
-            speak(`Welcome to UrbanPulse AI, ${p.full_name || 'friend'}. Where are you planning to go today?`, 'en-IN');
-          }, 1000);
-        }
+        await loadProfile(session.user.id);
       } else {
         setProfile(null);
       }
@@ -78,7 +69,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
-    setGreeted(false);
   };
 
   const refreshProfile = async () => {
