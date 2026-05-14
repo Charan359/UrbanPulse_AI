@@ -67,8 +67,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
+    }
+    // Force clear state regardless of API result
+    setUser(null);
+    setSession(null);
     setProfile(null);
+    // Clear any cached Supabase tokens
+    localStorage.removeItem('sb-' + import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] + '-auth-token');
+    // Hard reload to fully reset app state
+    window.location.href = '/';
   };
 
   const refreshProfile = async () => {
