@@ -34,6 +34,12 @@ export interface ScoredRoute {
   women: number;
   access: number;
   resilience: number;
+  sunlight: number;
+  treeCover: number;
+  pm25: number;
+  cctvDensity: number;
+  sidewalkQuality: number;
+  crowdDensity: number;
   exposure: "Low" | "Moderate" | "High";
   reasons: string[];
   recommended?: boolean;
@@ -63,18 +69,50 @@ const REASONS: Record<RouteKind, string[]> = {
 
 const KIND_ORDER: RouteKind[] = ["shortest", "coolest", "aqi", "women", "access", "safest"];
 
+// Generate synthetic route variations from a single base route
+function generateVariants(base: DirectionsRoute, count: number): DirectionsRoute[] {
+  const variants: DirectionsRoute[] = [base];
+  const coords = base.geometry.coordinates;
+
+  for (let v = 1; v < count; v++) {
+    // Slightly shift coordinates to simulate alternative paths
+    const offset = (v * 0.0008);
+    const direction = v % 2 === 0 ? 1 : -1;
+    const shiftedCoords = coords.map((c, i) => {
+      const factor = Math.sin((i / coords.length) * Math.PI); // max shift at midpoint
+      return [
+        c[0] + offset * factor * direction,
+        c[1] + offset * factor * (direction * 0.7),
+      ] as [number, number];
+    });
+
+    variants.push({
+      geometry: { type: "LineString", coordinates: shiftedCoords },
+      // Slightly vary distance/duration to make each route feel different
+      distance: base.distance * (1 + (v * 0.08) * (v % 2 === 0 ? 1 : 0.6)),
+      duration: base.duration * (1 + (v * 0.06) * (v % 2 === 0 ? 1.2 : 0.8)),
+    });
+  }
+  return variants;
+}
+
 export function scoreRoutes(routes: DirectionsRoute[]): ScoredRoute[] {
   if (!routes.length) return [];
 
-  // Map each Mapbox alternative to a "kind", recycling kinds when fewer routes exist.
-  const out: ScoredRoute[] = routes.map((r, i) => {
+  // If we have fewer than 6 routes, generate synthetic alternatives
+  let expanded = routes;
+  if (routes.length < 6) {
+    expanded = generateVariants(routes[0], 6);
+  }
+
+  const out: ScoredRoute[] = expanded.map((r, i) => {
     const kind = KIND_ORDER[i % KIND_ORDER.length];
     const pal = ROUTE_PALETTES[kind];
-    const seed = hash(r.geometry.coordinates);
+    const seed = hash(r.geometry.coordinates) + i * 7919; // unique seed per variant
     const distanceKm = r.distance / 1000;
     const etaMin = Math.max(1, Math.round(r.duration / 60));
 
-    // Bias scores so each "kind" excels at its dimension.
+    // Base random scores
     const base = {
       aqi: 60 + Math.round(rand(seed, 1) * 100),
       heatC: 30 + rand(seed, 2) * 12,
@@ -83,14 +121,21 @@ export function scoreRoutes(routes: DirectionsRoute[]): ScoredRoute[] {
       women: 50 + Math.round(rand(seed, 5) * 45),
       access: 50 + Math.round(rand(seed, 6) * 45),
       resilience: 50 + Math.round(rand(seed, 7) * 45),
+      sunlight: 30 + Math.round(rand(seed, 8) * 60),
+      treeCover: 20 + Math.round(rand(seed, 9) * 65),
+      pm25: 15 + Math.round(rand(seed, 10) * 80),
+      cctvDensity: 30 + Math.round(rand(seed, 11) * 60),
+      sidewalkQuality: 40 + Math.round(rand(seed, 12) * 55),
+      crowdDensity: 20 + Math.round(rand(seed, 13) * 70),
     };
 
-    if (kind === "shortest") { base.aqi = Math.max(base.aqi, 160); base.heatC = Math.max(base.heatC, 39); base.thermal = Math.min(base.thermal, 45); }
-    if (kind === "coolest")  { base.heatC = Math.min(base.heatC, 34); base.thermal = Math.max(base.thermal, 82); }
-    if (kind === "aqi")      { base.aqi = Math.min(base.aqi, 70); base.resilience = Math.max(base.resilience, 78); }
-    if (kind === "women")    { base.women = Math.max(base.women, 92); base.safety = Math.max(base.safety, 88); }
-    if (kind === "access")   { base.access = Math.max(base.access, 92); }
-    if (kind === "safest")   { base.safety = Math.max(base.safety, 92); }
+    // Bias: each kind excels at its dimension
+    if (kind === "shortest") { base.aqi = Math.max(base.aqi, 155); base.heatC = Math.max(base.heatC, 39); base.thermal = Math.min(base.thermal, 45); base.sunlight = Math.max(base.sunlight, 75); base.pm25 = Math.max(base.pm25, 65); }
+    if (kind === "coolest")  { base.heatC = Math.min(base.heatC, 32); base.thermal = Math.max(base.thermal, 85); base.treeCover = Math.max(base.treeCover, 78); base.sunlight = Math.min(base.sunlight, 35); }
+    if (kind === "aqi")      { base.aqi = Math.min(base.aqi, 55); base.pm25 = Math.min(base.pm25, 22); base.resilience = Math.max(base.resilience, 82); base.treeCover = Math.max(base.treeCover, 70); }
+    if (kind === "women")    { base.women = Math.max(base.women, 93); base.safety = Math.max(base.safety, 89); base.cctvDensity = Math.max(base.cctvDensity, 85); base.crowdDensity = Math.max(base.crowdDensity, 72); }
+    if (kind === "access")   { base.access = Math.max(base.access, 94); base.sidewalkQuality = Math.max(base.sidewalkQuality, 88); }
+    if (kind === "safest")   { base.safety = Math.max(base.safety, 93); base.cctvDensity = Math.max(base.cctvDensity, 82); base.crowdDensity = Math.max(base.crowdDensity, 68); }
 
     const exposure: ScoredRoute["exposure"] =
       base.heatC > 38 || base.aqi > 150 ? "High" :
@@ -104,6 +149,9 @@ export function scoreRoutes(routes: DirectionsRoute[]): ScoredRoute[] {
       heatC: Math.round(base.heatC),
       thermal: base.thermal, safety: base.safety, women: base.women,
       access: base.access, resilience: base.resilience,
+      sunlight: base.sunlight, treeCover: base.treeCover, pm25: base.pm25,
+      cctvDensity: base.cctvDensity, sidewalkQuality: base.sidewalkQuality,
+      crowdDensity: base.crowdDensity,
       exposure, reasons: REASONS[kind], estimated: true,
     };
   });
@@ -122,3 +170,4 @@ export function scoreRoutes(routes: DirectionsRoute[]): ScoredRoute[] {
   };
   return [...out, aiClone];
 }
+

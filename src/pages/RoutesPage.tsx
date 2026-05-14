@@ -208,12 +208,12 @@ function RoutesPage() {
 
         {/* AI factors */}
         <div className="mt-10 grid md:grid-cols-3 gap-4">
-          <FactorTile icon={Sun} title="Sunlight Exposure" value="AI Est." color="var(--neon)" />
-          <FactorTile icon={Leaf} title="Tree Coverage" value="AI Est." color="var(--emerald)" />
-          <FactorTile icon={Wind} title="PM2.5" value="AI Est." color="var(--cyan)" />
-          <FactorTile icon={Shield} title="CCTV Density" value="AI Est." color="var(--violet)" />
-          <FactorTile icon={Accessibility} title="Sidewalk Quality" value="AI Est." color="var(--primary)" />
-          <FactorTile icon={Activity} title="Crowd Density" value="AI Est." color="var(--accent)" />
+          <FactorTile icon={Sun} title="Sunlight Exposure" value={current ? `${current.sunlight}%` : "—"} color="var(--neon)" />
+          <FactorTile icon={Leaf} title="Tree Coverage" value={current ? `${current.treeCover}%` : "—"} color="var(--emerald)" />
+          <FactorTile icon={Wind} title="PM2.5" value={current ? `${current.pm25} µg/m³` : "—"} color="var(--cyan)" />
+          <FactorTile icon={Shield} title="CCTV Density" value={current ? `${current.cctvDensity}%` : "—"} color="var(--violet)" />
+          <FactorTile icon={Accessibility} title="Sidewalk Quality" value={current ? `${current.sidewalkQuality}%` : "—"} color="var(--primary)" />
+          <FactorTile icon={Activity} title="Crowd Density" value={current ? `${current.crowdDensity}%` : "—"} color="var(--accent)" />
         </div>
       </main>
     </div>
