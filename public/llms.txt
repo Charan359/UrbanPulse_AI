@@ -1,0 +1,16 @@
+# UrbanPulse AI
+
+> AI-powered smart-city operating system for climate-resilient, safe, accessible and human-centric urban mobility.
+
+UrbanPulse AI fuses live sensor, satellite and computer-vision data to score every street block on thermal comfort, air quality, women safety and accessibility — then recommends the most human-centric route between any two points.
+
+## Pages
+
+- [Home](/): Platform overview, hero map and AI-redesigned city simulation.
+- [Command Center](/dashboard): Live smart-city dashboard for heat, AQI, safety, accessibility and resilience.
+- [Route Engine](/routes): Compare shortest, coolest, safest, lowest-AQI, women-safe and AI-recommended routes.
+- [ShadowPath AI](/shadowpath): Thermal-comfort navigation through the coolest, shaded routes.
+- [AirSense AI](/airsense): Hyperlocal AQI, PM2.5 and NO₂ monitoring with respiratory-safe routing.
+- [SafePath Guardian](/safepath): Women-safety navigation across lit, crowded, CCTV-monitored corridors.
+- [VisionAssist AI](/visionassist): Voice navigation and obstacle detection for visually impaired pedestrians.
+- [About](/about): Mission, architecture and the climate-intelligence platform behind UrbanPulse AI.
