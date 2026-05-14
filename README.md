@@ -108,10 +108,13 @@ src/
 │   ├── SmartMap.tsx       # Leaflet interactive map with overlays
 │   ├── MapboxRouteMap.tsx # Leaflet route visualization map
 │   ├── Assistant.tsx      # Voice-enabled Groq AI chat (TTS + STT + 15 languages)
-│   ├── AuthModal.tsx      # Supabase login/signup overlay
+│   ├── AuthModal.tsx      # Email OTP + Password + Google OAuth login/signup
 │   ├── ProtectedRoute.tsx # Auth-gated route wrapper
 │   ├── FeaturePage.tsx    # Reusable feature page template
-│   └── MetricCard.tsx     # Glowing dashboard metric cards
+│   ├── MetricCard.tsx     # Glowing dashboard metric cards
+│   ├── VoiceAssistProvider.tsx  # Global voice-first accessibility context
+│   ├── VoiceCommandButton.tsx   # Floating mic button with animations
+│   └── VoiceOnboarding.tsx      # Mic permission modal with privacy notice
 ├── contexts/
 │   ├── AuthContext.tsx    # Supabase auth state provider
 │   ├── ThemeContext.tsx   # Dark/light theme provider
@@ -123,8 +126,9 @@ src/
 │   ├── groq.ts            # Groq AI client
 │   ├── mapbox.ts          # Photon geocoding & OSRM routing (free OSM)
 │   ├── route-ai.ts        # AI route scoring engine (6-way comparison)
-│   ├── voice.ts           # Voice AI engine (TTS + STT, 15 languages)
-│   ├── database.ts        # Supabase CRUD helpers
+│   ├── voice.ts           # Voice AI engine (TTS + STT, 15 languages, Chrome workarounds)
+│   ├── voiceCommands.ts   # Command parser, destination extractor, page talkback
+│   ├── database.ts        # Supabase CRUD + user profile helpers
 │   └── utils.ts           # Tailwind merge utility
 ├── pages/
 │   ├── Index.tsx           # Landing page with feature modals
@@ -137,7 +141,7 @@ src/
 │   ├── About.tsx           # Project information
 │   └── NotFound.tsx        # 404 page
 ├── styles.css              # Global design tokens, animations & themes
-├── App.tsx                 # Router & layout (ThemeProvider + RouteProvider + AuthProvider)
+├── App.tsx                 # Router & layout (Theme + Route + Auth + VoiceAssist providers)
 └── main.tsx                # Vite entry point
 ```
 
@@ -206,9 +210,9 @@ Each route shows **6 live factor tiles**: Sunlight Exposure, Tree Coverage, PM2.
 
 ## 🎤 Voice AI Engine
 
-UrbanPulse AI includes a **fully multilingual voice system** built on the browser's native Web Speech API — **zero external API keys required**.
+UrbanPulse AI includes a **fully multilingual voice-first accessibility system** built on the browser's native Web Speech API — **zero external API keys required**.
 
-### Capabilities
+### Core Capabilities
 
 | Feature | Description |
 |---------|-------------|
@@ -219,11 +223,70 @@ UrbanPulse AI includes a **fully multilingual voice system** built on the browse
 | 💬 **Voice Chat** | Tap mic → speak → AI responds in text + voice |
 | 🔇 **Mute Control** | Toggle voice output on/off anytime |
 
-### Where It's Used
+### Voice-First Accessibility Mode
 
-1. **AI Assistant** (bottom-right chat bubble) — 🎤 mic button + 🌐 language picker + auto-speaks responses
-2. **VisionAssist Page** (`/visionassist`) — Full voice navigation with obstacle alerts, voice query panel, and live alert feed
-3. **Route recommendations** — Route narration for visually impaired users
+When `is_visually_impaired = true` in the user profile, the entire website becomes voice-interactive:
+
+#### 1. Welcome Greeting
+After login, the app speaks:
+> *"Welcome to UrbanPulse AI, [name]. I am your voice assistant. Where are you planning to go today?"*
+
+Then the microphone activates automatically.
+
+#### 2. Destination Understanding
+Users can speak naturally:
+- *"I want to go to MG Road"*
+- *"Take me to the bus stand"*
+- *"Find the safest route to college"*
+
+The AI extracts the destination and confirms:
+> *"You want to go to MG Road. Should I find the safest and most accessible route? Say yes or no."*
+
+#### 3. Page Talkback
+Every page announces itself when opened:
+
+| Page | Announcement |
+|------|-------------|
+| Home | "You are on the home page. Say find route, dashboard, or help." |
+| Dashboard | "You are on the dashboard. Say route, AQI, heat map, safety, or help." |
+| Routes | "You are on the route engine. Tell me where you want to go." |
+| VisionAssist | "You are on VisionAssist. Tap the microphone to speak." |
+| All others | Contextual page description |
+
+#### 4. Voice Commands
+
+| Command | Action |
+|---------|--------|
+| "Go to dashboard" | Navigate to Dashboard |
+| "Find route" | Open Route Engine |
+| "Open AQI" | Open AirSense AI |
+| "Open safety" | Open SafePath Guardian |
+| "Open VisionAssist" | Open Accessibility page |
+| "Help" | List all commands |
+| "Repeat" | Re-speak last message |
+| "Stop speaking" | Silence voice output |
+
+#### 5. Live Journey Updates
+During active navigation, the system speaks:
+- *"Turn left in 50 meters."*
+- *"AQI is poor ahead. Switching to cleaner route."*
+- *"Obstacle detected. Move slightly right."*
+- *"You are entering a safer, well-lit area."*
+
+### Architecture
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Voice Engine | `src/lib/voice.ts` | TTS/STT with preloader, Chrome workarounds |
+| Voice Commands | `src/lib/voiceCommands.ts` | Command parser, destination extractor, page announcements |
+| VoiceAssistProvider | `src/components/VoiceAssistProvider.tsx` | Global context — welcome, talkback, command handling |
+| VoiceCommandButton | `src/components/VoiceCommandButton.tsx` | Floating mic button with pulse animations |
+| VoiceOnboarding | `src/components/VoiceOnboarding.tsx` | Mic permission modal with privacy notice |
+
+### Privacy & Safety
+- 🔒 Microphone permission requested with clear explanation before first use
+- 🚫 No voice recordings stored — only transcribed text is processed
+- 🎛️ Any user can enable/disable voice mode via the floating button (bottom-left)
 
 ---
 
