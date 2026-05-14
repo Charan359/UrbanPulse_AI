@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { ScoredRoute } from "@/lib/route-ai";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   from?: [number, number];
@@ -28,23 +29,29 @@ export function LeafletRouteMap({ from, to, routes, activeKind, onActivate }: Pr
   const mapRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.LayerGroup>(L.layerGroup());
   const markerLayerRef = useRef<L.LayerGroup>(L.layerGroup());
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const { theme } = useTheme();
 
   // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [12.9716, 77.5946], // Bengaluru
+      center: [12.9716, 77.5946],
       zoom: 13,
       zoomControl: false,
       attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    const tileUrl = theme === 'light'
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    const tiles = L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 19,
     }).addTo(map);
+    tileLayerRef.current = tiles;
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.attribution({ position: "bottomright" }).addTo(map);
@@ -55,6 +62,15 @@ export function LeafletRouteMap({ from, to, routes, activeKind, onActivate }: Pr
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
   }, []);
+
+  // Swap tiles when theme changes
+  useEffect(() => {
+    if (!mapRef.current || !tileLayerRef.current) return;
+    const newUrl = theme === 'light'
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    tileLayerRef.current.setUrl(newUrl);
+  }, [theme]);
 
   // Draw routes and markers
   useEffect(() => {

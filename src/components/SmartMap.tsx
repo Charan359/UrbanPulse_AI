@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Flame, Wind, Route, Shield, Eye } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const layers = [
   { id: "heat", label: "Heat", icon: Flame, color: "var(--neon)" },
@@ -72,7 +73,9 @@ export function SmartMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const layerGroups = useRef<Record<string, L.LayerGroup>>({});
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [active, setActive] = useState<string[]>(["heat", "aqi", "routes"]);
+  const { theme } = useTheme();
 
   const toggle = (id: string) =>
     setActive(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
@@ -88,12 +91,16 @@ export function SmartMap() {
       attributionControl: false,
     });
 
-    // Dark themed tiles
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    // Themed tiles
+    const tileUrl = theme === 'light'
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    const tiles = L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: "abcd",
       maxZoom: 19,
     }).addTo(map);
+    tileLayerRef.current = tiles;
 
     L.control.attribution({ position: "bottomright" }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -153,6 +160,16 @@ export function SmartMap() {
 
     return () => { map.remove(); leafletMap.current = null; };
   }, []);
+
+  // Swap tiles when theme changes
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map || !tileLayerRef.current) return;
+    const newUrl = theme === 'light'
+      ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+    tileLayerRef.current.setUrl(newUrl);
+  }, [theme]);
 
   // Sync active layers
   useEffect(() => {
