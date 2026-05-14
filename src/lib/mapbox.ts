@@ -1,17 +1,14 @@
-// Real Mapbox API wrappers (Geocoding + Directions)
-// Token is provided via VITE_MAPBOX_TOKEN env or runtime localStorage entry.
+// Geocoding via Nominatim (free OSM) + Routing via OSRM (free OSM)
+// No API key required!
 
 const LS_KEY = "urbanpulse:mapbox_token";
 
 export function getMapboxToken(): string {
-  const env = (import.meta as any).env?.VITE_MAPBOX_TOKEN as string | undefined;
-  if (env) return env;
-  if (typeof window !== "undefined") return localStorage.getItem(LS_KEY) ?? "";
-  return "";
+  return "osm"; // Always return a truthy value so the UI never gates on a token
 }
 
-export function setMapboxToken(token: string) {
-  if (typeof window !== "undefined") localStorage.setItem(LS_KEY, token.trim());
+export function setMapboxToken(_token: string) {
+  // No-op — we no longer need a token
 }
 
 export interface GeocodeFeature {
@@ -21,18 +18,34 @@ export interface GeocodeFeature {
 }
 
 export async function geocode(query: string, proximity?: [number, number]): Promise<GeocodeFeature[]> {
-  const token = getMapboxToken();
-  if (!token || !query.trim()) return [];
-  const url = new URL(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json`);
-  url.searchParams.set("access_token", token);
-  url.searchParams.set("autocomplete", "true");
+  if (!query.trim()) return [];
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "json");
   url.searchParams.set("limit", "5");
-  if (proximity) url.searchParams.set("proximity", `${proximity[0]},${proximity[1]}`);
-  const res = await fetch(url.toString());
+  url.searchParams.set("addressdetails", "1");
+
+  // Bias results towards Bengaluru
+  if (proximity) {
+    url.searchParams.set("viewbox", `${proximity[0] - 0.5},${proximity[1] - 0.5},${proximity[0] + 0.5},${proximity[1] + 0.5}`);
+    url.searchParams.set("bounded", "0");
+  } else {
+    // Default: bias to Bengaluru, India
+    url.searchParams.set("viewbox", "77.3,12.7,77.9,13.2");
+    url.searchParams.set("bounded", "0");
+  }
+
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": "UrbanPulseAI/1.0" },
+  });
   if (!res.ok) throw new Error("Geocoding failed");
   const data = await res.json();
-  return (data.features ?? []).map((f: any) => ({
-    id: f.id, place_name: f.place_name, center: f.center as [number, number],
+
+  return (data ?? []).map((item: any) => ({
+    id: String(item.place_id),
+    place_name: item.display_name,
+    center: [parseFloat(item.lon), parseFloat(item.lat)] as [number, number],
   }));
 }
 
@@ -45,22 +58,42 @@ export interface DirectionsRoute {
 
 export type DirectionsProfile = "driving" | "walking" | "cycling" | "driving-traffic";
 
+// Map our profile names to OSRM profile names
+function osrmProfile(profile: DirectionsProfile): string {
+  switch (profile) {
+    case "walking": return "foot";
+    case "cycling": return "bike";
+    case "driving":
+    case "driving-traffic":
+    default: return "car";
+  }
+}
+
 export async function directions(
   from: [number, number],
   to: [number, number],
   profile: DirectionsProfile = "walking",
 ): Promise<DirectionsRoute[]> {
-  const token = getMapboxToken();
-  if (!token) throw new Error("Missing Mapbox token");
+  // OSRM public demo server — only supports 'driving' profile
+  // We use driving geometry and scale duration for other modes
   const coords = `${from[0]},${from[1]};${to[0]},${to[1]}`;
-  const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}`);
-  url.searchParams.set("access_token", token);
-  url.searchParams.set("alternatives", "true");
-  url.searchParams.set("geometries", "geojson");
-  url.searchParams.set("overview", "full");
-  url.searchParams.set("steps", "false");
-  const res = await fetch(url.toString());
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?alternatives=true&geometries=geojson&overview=full`;
+
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Directions request failed");
   const data = await res.json();
-  return (data.routes ?? []) as DirectionsRoute[];
+
+  if (data.code !== "Ok" || !data.routes?.length) {
+    throw new Error(data.message || "No routes found");
+  }
+
+  // Duration multipliers relative to driving
+  const durationScale = profile === "walking" ? 4.5 : profile === "cycling" ? 2.0 : 1.0;
+
+  return data.routes.map((r: any) => ({
+    geometry: r.geometry,
+    distance: r.distance,
+    duration: r.duration * durationScale,
+    weight_name: r.weight_name,
+  }));
 }
