@@ -27,7 +27,7 @@ Respond in a friendly, high-tech, and professional tone. Keep responses under 3 
         },
         ...messages
       ],
-      model: 'llama3-8b-8192',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.5,
       max_tokens: 512,
     });
