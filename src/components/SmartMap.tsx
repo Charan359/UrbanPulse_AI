@@ -1,5 +1,6 @@
-// Stylized "smart city" map with animated heat, AQI, routes and pulse markers (no Mapbox token needed)
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { Flame, Wind, Route, Shield, Eye } from "lucide-react";
 
 const layers = [
@@ -10,121 +11,183 @@ const layers = [
   { id: "access", label: "Access", icon: Eye, color: "var(--accent)" },
 ];
 
+// Bengaluru center
+const CITY_CENTER: [number, number] = [12.9716, 77.5946];
+
+// Simulated heat zones
+const HEAT_ZONES = [
+  { center: [12.975, 77.600] as [number, number], radius: 600, color: "#ff6b00", label: "MG Road — 42°C" },
+  { center: [12.966, 77.580] as [number, number], radius: 500, color: "#ff2e63", label: "Town Hall — AQI 162" },
+  { center: [12.980, 77.575] as [number, number], radius: 450, color: "#ff6b00", label: "Cubbon Park — 38°C" },
+];
+
+// AQI zones
+const AQI_ZONES = [
+  { center: [12.960, 77.595] as [number, number], radius: 700, color: "#00e5ff", label: "South Blvd — AQI 42" },
+  { center: [12.985, 77.610] as [number, number], radius: 550, color: "#00ff9f", label: "Whitefield — AQI 28" },
+];
+
+// Safety markers
+const SAFETY_MARKERS = [
+  { pos: [12.974, 77.604] as [number, number], label: "CCTV Node · Brigade Rd", safe: true },
+  { pos: [12.968, 77.590] as [number, number], label: "Low-Lit Zone · Avoid after 9PM", safe: false },
+  { pos: [12.978, 77.582] as [number, number], label: "CCTV Node · Church St", safe: true },
+  { pos: [12.982, 77.598] as [number, number], label: "Foot Traffic: High", safe: true },
+];
+
+// Accessibility points
+const ACCESS_POINTS = [
+  { pos: [12.972, 77.597] as [number, number], label: "Ramp Access · Metro Station" },
+  { pos: [12.969, 77.585] as [number, number], label: "Tactile Path · Bus Stop" },
+  { pos: [12.977, 77.570] as [number, number], label: "Audio Signal · Crossing" },
+];
+
+// ShadowPath route
+const SHADOW_ROUTE: [number, number][] = [
+  [12.963, 77.590], [12.967, 77.588], [12.970, 77.585],
+  [12.974, 77.582], [12.977, 77.578], [12.980, 77.575],
+  [12.983, 77.572],
+];
+
+// Safe path route
+const SAFE_ROUTE: [number, number][] = [
+  [12.970, 77.605], [12.972, 77.602], [12.974, 77.600],
+  [12.976, 77.597], [12.978, 77.594], [12.980, 77.590],
+];
+
+function pulseIcon(color: string) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width:14px; height:14px; border-radius:50%;
+      background:${color}; box-shadow: 0 0 12px ${color};
+      animation: pulse-dot 2s ease-in-out infinite;
+    "></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
 export function SmartMap() {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const leafletMap = useRef<L.Map | null>(null);
+  const layerGroups = useRef<Record<string, L.LayerGroup>>({});
   const [active, setActive] = useState<string[]>(["heat", "aqi", "routes"]);
-  const toggle = (id: string) => setActive(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
+
+  const toggle = (id: string) =>
+    setActive(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
   const on = (id: string) => active.includes(id);
+
+  useEffect(() => {
+    if (!mapRef.current || leafletMap.current) return;
+
+    const map = L.map(mapRef.current, {
+      center: CITY_CENTER,
+      zoom: 14,
+      zoomControl: false,
+      attributionControl: false,
+    });
+
+    // Dark themed tiles
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.attribution({ position: "bottomright" }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+
+    // ── Heat layer ──
+    const heatLayer = L.layerGroup();
+    HEAT_ZONES.forEach(z => {
+      L.circle(z.center, { radius: z.radius, color: z.color, fillColor: z.color, fillOpacity: 0.25, weight: 1 })
+        .bindPopup(`<b>${z.label}</b>`)
+        .addTo(heatLayer);
+    });
+
+    // ── AQI layer ──
+    const aqiLayer = L.layerGroup();
+    AQI_ZONES.forEach(z => {
+      L.circle(z.center, { radius: z.radius, color: z.color, fillColor: z.color, fillOpacity: 0.2, weight: 1 })
+        .bindPopup(`<b>${z.label}</b>`)
+        .addTo(aqiLayer);
+    });
+
+    // ── Routes layer ──
+    const routeLayer = L.layerGroup();
+    L.polyline(SHADOW_ROUTE, { color: "#00ff9f", weight: 4, opacity: 0.8, dashArray: "10 6" })
+      .bindPopup("<b>ShadowPath</b><br/>Coolest route · -5.4°C avg")
+      .addTo(routeLayer);
+    L.marker(SHADOW_ROUTE[0], { icon: pulseIcon("#00ff9f") }).bindPopup("Start").addTo(routeLayer);
+    L.marker(SHADOW_ROUTE[SHADOW_ROUTE.length - 1], { icon: pulseIcon("#00ff9f") }).bindPopup("Destination").addTo(routeLayer);
+
+    // ── Safety layer ──
+    const safetyLayer = L.layerGroup();
+    L.polyline(SAFE_ROUTE, { color: "#7c4dff", weight: 4, opacity: 0.8, dashArray: "8 8" })
+      .bindPopup("<b>SafePath</b><br/>Highest safety score · 91%")
+      .addTo(safetyLayer);
+    SAFETY_MARKERS.forEach(m => {
+      L.marker(m.pos, { icon: pulseIcon(m.safe ? "#7c4dff" : "#ff2e63") })
+        .bindPopup(`<b>${m.label}</b>`)
+        .addTo(safetyLayer);
+    });
+
+    // ── Accessibility layer ──
+    const accessLayer = L.layerGroup();
+    ACCESS_POINTS.forEach(p => {
+      L.marker(p.pos, { icon: pulseIcon("#00e5ff") })
+        .bindPopup(`<b>${p.label}</b>`)
+        .addTo(accessLayer);
+    });
+
+    layerGroups.current = {
+      heat: heatLayer,
+      aqi: aqiLayer,
+      routes: routeLayer,
+      safety: safetyLayer,
+      access: accessLayer,
+    };
+
+    leafletMap.current = map;
+
+    return () => { map.remove(); leafletMap.current = null; };
+  }, []);
+
+  // Sync active layers
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map) return;
+    Object.entries(layerGroups.current).forEach(([id, group]) => {
+      if (active.includes(id)) {
+        if (!map.hasLayer(group)) map.addLayer(group);
+      } else {
+        if (map.hasLayer(group)) map.removeLayer(group);
+      }
+    });
+  }, [active]);
 
   return (
     <div className="relative glass-strong rounded-3xl overflow-hidden h-[640px]">
-      {/* base map */}
-      <svg viewBox="0 0 1200 700" className="absolute inset-0 w-full h-full">
-        <defs>
-          <pattern id="grid2" width="60" height="60" patternUnits="userSpaceOnUse">
-            <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(0,229,255,0.08)" strokeWidth="1"/>
-          </pattern>
-          <linearGradient id="path-grad" x1="0" x2="1">
-            <stop offset="0%" stopColor="#00e5ff"/>
-            <stop offset="100%" stopColor="#00ff9f"/>
-          </linearGradient>
-          <linearGradient id="path-safe" x1="0" x2="1">
-            <stop offset="0%" stopColor="#7c4dff"/>
-            <stop offset="100%" stopColor="#00e5ff"/>
-          </linearGradient>
-        </defs>
-        <rect width="1200" height="700" fill="#06101e"/>
-        <rect width="1200" height="700" fill="url(#grid2)"/>
+      <div ref={mapRef} className="absolute inset-0 z-0" />
 
-        {/* "blocks" */}
-        <g opacity="0.35">
-          {Array.from({ length: 80 }).map((_, i) => {
-            const x = (i % 10) * 120 + 20;
-            const y = Math.floor(i / 10) * 80 + 20;
-            return <rect key={i} x={x} y={y} width="100" height="60" rx="4" fill="#0c1a2e" stroke="rgba(0,229,255,0.08)"/>;
-          })}
-        </g>
-
-        {/* roads */}
-        <g stroke="rgba(255,255,255,0.08)" strokeWidth="2">
-          {Array.from({ length: 9 }).map((_, i) => <line key={`h${i}`} x1="0" y1={i * 80 + 80} x2="1200" y2={i * 80 + 80}/>)}
-          {Array.from({ length: 11 }).map((_, i) => <line key={`v${i}`} x1={i * 120 + 20} y1="0" x2={i * 120 + 20} y2="700"/>)}
-        </g>
-
-        {/* heat overlay */}
-        {on("heat") && (
-          <g style={{ mixBlendMode: "screen" }}>
-            <circle cx="280" cy="220" r="160" fill="#ff6b00" opacity="0.28"/>
-            <circle cx="900" cy="180" r="200" fill="#ff2e63" opacity="0.22"/>
-            <circle cx="700" cy="500" r="180" fill="#ff6b00" opacity="0.25"/>
-          </g>
-        )}
-        {/* aqi overlay */}
-        {on("aqi") && (
-          <g style={{ mixBlendMode: "screen" }}>
-            <circle cx="500" cy="350" r="220" fill="#00e5ff" opacity="0.18"/>
-            <circle cx="1050" cy="500" r="180" fill="#00ff9f" opacity="0.22"/>
-          </g>
-        )}
-
-        {/* shaded route */}
-        {on("routes") && (
-          <path d="M 80 600 C 250 500, 380 540, 500 420 S 800 300, 1080 240"
-                fill="none" stroke="url(#path-grad)" strokeWidth="5" strokeLinecap="round"
-                strokeDasharray="2000" strokeDashoffset="2000"
-                style={{ animation: "route-draw 3s ease-out forwards", filter: "drop-shadow(0 0 8px #00e5ff)" }}/>
-        )}
-
-        {/* safety route */}
-        {on("safety") && (
-          <path d="M 120 120 C 320 220, 480 180, 620 280 S 980 380, 1120 620"
-                fill="none" stroke="url(#path-safe)" strokeWidth="4" strokeLinecap="round" strokeDasharray="8 8"
-                style={{ filter: "drop-shadow(0 0 6px #7c4dff)" }}/>
-        )}
-
-        {/* accessibility markers */}
-        {on("access") && (
-          <g>
-            {[[200,150],[420,260],[760,360],[1000,540],[300,520]].map(([x,y],i)=>(
-              <g key={i}>
-                <circle cx={x} cy={y} r="14" fill="none" stroke="#00e5ff" strokeWidth="2" opacity="0.6">
-                  <animate attributeName="r" values="14;28;14" dur="2.4s" repeatCount="indefinite" begin={`${i*0.4}s`}/>
-                  <animate attributeName="opacity" values="0.7;0;0.7" dur="2.4s" repeatCount="indefinite" begin={`${i*0.4}s`}/>
-                </circle>
-                <circle cx={x} cy={y} r="5" fill="#00e5ff"/>
-              </g>
-            ))}
-          </g>
-        )}
-
-        {/* live pulse points */}
-        {[[290,210,"#ff6b00"],[860,180,"#ff2e63"],[680,490,"#ff6b00"],[1080,240,"#00ff9f"]].map(([x,y,c],i)=>(
-          <g key={i}>
-            <circle cx={x as number} cy={y as number} r="6" fill={c as string}/>
-            <circle cx={x as number} cy={y as number} r="6" fill="none" stroke={c as string} strokeWidth="2">
-              <animate attributeName="r" values="6;28;6" dur="2s" repeatCount="indefinite" begin={`${i*0.5}s`}/>
-              <animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite" begin={`${i*0.5}s`}/>
-            </circle>
-          </g>
-        ))}
-      </svg>
-
-      {/* layer toggles */}
-      <div className="absolute top-4 left-4 glass rounded-2xl p-2 flex flex-col gap-1">
+      {/* Layer toggles */}
+      <div className="absolute top-4 left-4 z-[400] glass rounded-2xl p-2 flex flex-col gap-1">
         {layers.map(l => {
-          const active = on(l.id);
+          const isActive = on(l.id);
           return (
             <button key={l.id} onClick={() => toggle(l.id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition ${active ? "bg-white/10" : "hover:bg-white/5 opacity-60"}`}>
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition ${isActive ? "bg-white/10" : "hover:bg-white/5 opacity-60"}`}>
               <l.icon className="h-4 w-4" style={{ color: l.color }}/>
               {l.label}
-              <span className={`ml-2 h-2 w-2 rounded-full`} style={{ background: active ? l.color : "transparent", border: `1px solid ${l.color}` }}/>
+              <span className="ml-2 h-2 w-2 rounded-full" style={{ background: isActive ? l.color : "transparent", border: `1px solid ${l.color}` }}/>
             </button>
           );
         })}
       </div>
 
-      {/* live HUD */}
-      <div className="absolute top-4 right-4 glass rounded-2xl px-4 py-3 text-xs space-y-1 font-mono">
+      {/* Live HUD */}
+      <div className="absolute top-4 right-4 z-[400] glass rounded-2xl px-4 py-3 text-xs space-y-1 font-mono">
         <div className="flex items-center gap-2 text-[color:var(--emerald)]">
           <span className="h-2 w-2 rounded-full bg-[color:var(--emerald)] animate-glow-pulse"/> LIVE FEED
         </div>
@@ -133,7 +196,8 @@ export function SmartMap() {
         <div>Latency: <span className="text-[color:var(--accent)]">38ms</span></div>
       </div>
 
-      <div className="absolute bottom-4 left-4 right-4 glass rounded-2xl p-4 flex flex-wrap items-center gap-4 text-xs">
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 right-4 z-[400] glass rounded-2xl p-4 flex flex-wrap items-center gap-4 text-xs">
         <Legend color="#ff6b00" label="Heat zone (>38°C)"/>
         <Legend color="#ff2e63" label="High AQI (>150)"/>
         <Legend color="#00ff9f" label="Cool corridor"/>
