@@ -429,8 +429,3 @@ This project targets the following impact areas:
 This project is licensed under the [MIT License](LICENSE).
 
 ---
-
-<p align="center">
-  Built with ❤️ for a climate-resilient future.<br/>
-  <strong>UrbanPulse AI</strong> — Smart City OS for the Next Century.
-</p>
