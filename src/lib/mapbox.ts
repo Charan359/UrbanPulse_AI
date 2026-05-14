@@ -1,15 +1,11 @@
-// Geocoding via Nominatim (free OSM) + Routing via OSRM (free OSM)
+// Geocoding via Photon (free OSM) + Routing via OSRM (free OSM)
 // No API key required!
 
-const LS_KEY = "urbanpulse:mapbox_token";
-
 export function getMapboxToken(): string {
-  return "osm"; // Always return a truthy value so the UI never gates on a token
+  return "osm"; // Always truthy — no token needed
 }
 
-export function setMapboxToken(_token: string) {
-  // No-op — we no longer need a token
-}
+export function setMapboxToken(_token: string) {}
 
 export interface GeocodeFeature {
   id: string;
@@ -17,33 +13,30 @@ export interface GeocodeFeature {
   center: [number, number]; // [lng, lat]
 }
 
-export async function geocode(query: string, proximity?: [number, number]): Promise<GeocodeFeature[]> {
+export async function geocode(query: string): Promise<GeocodeFeature[]> {
   if (!query.trim()) return [];
 
-  const url = new URL("https://nominatim.openstreetmap.org/search");
+  // Photon — free OSM geocoder by Komoot, no auth needed
+  const url = new URL("https://photon.komoot.io/api/");
   url.searchParams.set("q", query);
-  url.searchParams.set("format", "json");
   url.searchParams.set("limit", "5");
-  url.searchParams.set("countrycodes", "in");
-
   // Bias results towards Bengaluru
-  if (proximity) {
-    url.searchParams.set("viewbox", `${proximity[0] - 0.5},${proximity[1] + 0.5},${proximity[0] + 0.5},${proximity[1] - 0.5}`);
-    url.searchParams.set("bounded", "0");
-  } else {
-    url.searchParams.set("viewbox", "77.3,13.2,77.9,12.7");
-    url.searchParams.set("bounded", "0");
-  }
+  url.searchParams.set("lat", "12.9716");
+  url.searchParams.set("lon", "77.5946");
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Geocoding failed");
   const data = await res.json();
 
-  return (data ?? []).map((item: any) => ({
-    id: String(item.place_id),
-    place_name: item.display_name,
-    center: [parseFloat(item.lon), parseFloat(item.lat)] as [number, number],
-  }));
+  return (data.features ?? []).map((f: any) => {
+    const p = f.properties;
+    const parts = [p.name, p.street, p.city, p.state, p.country].filter(Boolean);
+    return {
+      id: String(f.properties.osm_id ?? Math.random()),
+      place_name: parts.join(", "),
+      center: [f.geometry.coordinates[0], f.geometry.coordinates[1]] as [number, number],
+    };
+  });
 }
 
 export interface DirectionsRoute {
@@ -55,24 +48,12 @@ export interface DirectionsRoute {
 
 export type DirectionsProfile = "driving" | "walking" | "cycling" | "driving-traffic";
 
-// Map our profile names to OSRM profile names
-function osrmProfile(profile: DirectionsProfile): string {
-  switch (profile) {
-    case "walking": return "foot";
-    case "cycling": return "bike";
-    case "driving":
-    case "driving-traffic":
-    default: return "car";
-  }
-}
-
 export async function directions(
   from: [number, number],
   to: [number, number],
   profile: DirectionsProfile = "walking",
 ): Promise<DirectionsRoute[]> {
   // OSRM public demo server — only supports 'driving' profile
-  // We use driving geometry and scale duration for other modes
   const coords = `${from[0]},${from[1]};${to[0]},${to[1]}`;
   const url = `https://router.project-osrm.org/route/v1/driving/${coords}?alternatives=true&geometries=geojson&overview=full`;
 
@@ -84,7 +65,7 @@ export async function directions(
     throw new Error(data.message || "No routes found");
   }
 
-  // Duration multipliers relative to driving
+  // Scale duration for walking/cycling since OSRM only has driving
   const durationScale = profile === "walking" ? 4.5 : profile === "cycling" ? 2.0 : 1.0;
 
   return data.routes.map((r: any) => ({
