@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Assistant } from "@/components/Assistant";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages for code-splitting
@@ -30,6 +31,7 @@ function PageLoader() {
 
 function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Navbar />
       <main className="min-h-screen">
@@ -50,6 +52,7 @@ function App() {
       <Footer />
       <Assistant />
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

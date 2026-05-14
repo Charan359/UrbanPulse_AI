@@ -1,7 +1,8 @@
 import { NavLink, Link } from "react-router-dom";
-import { Activity, Menu, X, User as UserIcon, LogOut } from "lucide-react";
+import { Activity, Menu, X, User as UserIcon, LogOut, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { AuthModal } from "./AuthModal";
 
 const links = [
@@ -19,6 +20,7 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="fixed top-0 inset-x-0 z-50">
@@ -55,6 +57,14 @@ export function Navbar() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-xl hover:bg-white/5 transition"
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
             <Link
               to="/dashboard"
               className="hidden sm:inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-[color:var(--primary-foreground)] glow-orange"
