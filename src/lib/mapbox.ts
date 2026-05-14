@@ -24,21 +24,18 @@ export async function geocode(query: string, proximity?: [number, number]): Prom
   url.searchParams.set("q", query);
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "5");
-  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("countrycodes", "in");
 
   // Bias results towards Bengaluru
   if (proximity) {
-    url.searchParams.set("viewbox", `${proximity[0] - 0.5},${proximity[1] - 0.5},${proximity[0] + 0.5},${proximity[1] + 0.5}`);
+    url.searchParams.set("viewbox", `${proximity[0] - 0.5},${proximity[1] + 0.5},${proximity[0] + 0.5},${proximity[1] - 0.5}`);
     url.searchParams.set("bounded", "0");
   } else {
-    // Default: bias to Bengaluru, India
-    url.searchParams.set("viewbox", "77.3,12.7,77.9,13.2");
+    url.searchParams.set("viewbox", "77.3,13.2,77.9,12.7");
     url.searchParams.set("bounded", "0");
   }
 
-  const res = await fetch(url.toString(), {
-    headers: { "User-Agent": "UrbanPulseAI/1.0" },
-  });
+  const res = await fetch(url.toString());
   if (!res.ok) throw new Error("Geocoding failed");
   const data = await res.json();
 

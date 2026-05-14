@@ -24,7 +24,7 @@ function RoutesPage() {
 
   const findRoutes = async () => {
     setError(null);
-    if (!from || !to) { setError("Select both a source and destination."); return; }
+    if (!from || !to) { setError("Please select locations from the dropdown suggestions."); return; }
     setLoading(true);
     try {
       const raw = await directions(from.center, to.center, profile);
@@ -33,7 +33,8 @@ function RoutesPage() {
       setRoutes(scored);
       setActive("ai");
     } catch (e: any) {
-      setError(e?.message ?? "Routing failed");
+      console.error("Route error:", e);
+      setError(e?.message ?? "Routing failed. Please try different locations.");
     } finally {
       setLoading(false);
     }
