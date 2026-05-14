@@ -43,6 +43,7 @@ A modular, AI-powered **Smart City Operating System** that:
 5. Offers an AI assistant (powered by Groq LLM) for instant climate and urban planning queries.
 6. Generates **6 AI-scored route alternatives** per search with multi-factor comparison.
 7. Supports **dark & light themes** across the entire app including maps.
+8. **Voice AI** — speaks navigation alerts aloud and accepts voice commands in **15 languages**.
 
 ---
 
@@ -54,12 +55,13 @@ A modular, AI-powered **Smart City Operating System** that:
 | 2 | **ShadowPath AI** | Sun-aware routing that avoids UV exposure and hot surfaces |
 | 3 | **SafePath Guardian AI** | CCTV, lighting, and incident-aware women safety navigation |
 | 4 | **AirSense AI** | AQI-optimized routing with PM2.5, NO₂, and CO₂ predictions |
-| 5 | **VisionAssist AI** | Voice-navigated obstacle detection for visually impaired users |
-| 6 | **AI Smart City Assistant** | Conversational AI powered by Groq (Llama 3) for urban queries |
+| 5 | **VisionAssist AI** | Voice-navigated obstacle detection + multilingual voice assistant (15 languages) |
+| 6 | **AI Smart City Assistant** | Voice-enabled conversational AI powered by Groq (Llama 3) with TTS/STT |
 | 7 | **Smart City Dashboard** | Real-time command center with sensor fusion and analytics |
 | 8 | **AI Route Optimization** | Multi-factor route scoring (thermal + AQI + safety + accessibility) |
 | 9 | **Interactive Leaflet Map** | Live OpenStreetMap with heat zones, AQI overlays, and route visualization |
 | 10 | **Dark/Light Theme** | Full theme system with theme-aware maps (CARTO dark/light tiles) |
+| 11 | **Voice AI Engine** | Multilingual TTS/STT using Web Speech API — 15 languages, zero API keys |
 
 ---
 
@@ -72,9 +74,10 @@ A modular, AI-powered **Smart City Operating System** that:
 - 🗺️ **Interactive Leaflet Map** — OpenStreetMap with toggleable data overlays (heat, AQI, routes, safety, accessibility)
 - 🌑 **ShadowPath Navigation** — Sun-aware cool-path finder
 - 🛡️ **Women Safety Dashboard** — Safety index with CCTV and lighting data
-- ♿ **Accessibility Mode** — VisionAssist navigation interface
-- 🤖 **AI Chat Assistant** — Real-time conversational AI (Groq-powered)
+- ♿ **VisionAssist** — Voice navigation with live obstacle alerts, multilingual voice assistant
+- 🤖 **AI Chat Assistant** — Voice-enabled conversational AI (Groq + TTS/STT)
 - 🛣️ **AI Route Engine** — 6-way route comparison with live factor tiles
+- 🎤 **Voice AI** — Speak in any of 15 languages, AI responds aloud
 - ℹ️ **About Project** — Architecture, mission, and team
 
 ---
@@ -92,7 +95,7 @@ A modular, AI-powered **Smart City Operating System** that:
 │ Tailwind v4 │ Llama 3     │ Leaflet + OpenStreetMap  │
 │ Glassmorphism│ Route AI   │ Photon Geocoder (OSM)    │
 │ OKLCH Colors│ Score Engine│ OSRM Routing (OSM)       │
-│ Theme System│            │ Geolocation               │
+│ Theme System│ Voice AI    │ Web Speech API (TTS/STT) │
 └─────────────┴─────────────┴─────────────────────────┘
 ```
 
@@ -104,14 +107,15 @@ src/
 │   ├── Hero.tsx          # Animated landing hero
 │   ├── SmartMap.tsx       # Leaflet interactive map with overlays
 │   ├── MapboxRouteMap.tsx # Leaflet route visualization map
-│   ├── Assistant.tsx      # Groq AI chat widget
+│   ├── Assistant.tsx      # Voice-enabled Groq AI chat (TTS + STT + 15 languages)
 │   ├── AuthModal.tsx      # Supabase login/signup overlay
 │   ├── ProtectedRoute.tsx # Auth-gated route wrapper
 │   ├── FeaturePage.tsx    # Reusable feature page template
 │   └── MetricCard.tsx     # Glowing dashboard metric cards
 ├── contexts/
 │   ├── AuthContext.tsx    # Supabase auth state provider
-│   └── ThemeContext.tsx   # Dark/light theme provider
+│   ├── ThemeContext.tsx   # Dark/light theme provider
+│   └── RouteContext.tsx   # Shared route state across pages
 ├── hooks/
 │   └── use-mobile.tsx     # Responsive breakpoint hook
 ├── lib/
@@ -119,20 +123,21 @@ src/
 │   ├── groq.ts            # Groq AI client
 │   ├── mapbox.ts          # Photon geocoding & OSRM routing (free OSM)
 │   ├── route-ai.ts        # AI route scoring engine (6-way comparison)
+│   ├── voice.ts           # Voice AI engine (TTS + STT, 15 languages)
 │   ├── database.ts        # Supabase CRUD helpers
 │   └── utils.ts           # Tailwind merge utility
 ├── pages/
-│   ├── Index.tsx           # Landing page
+│   ├── Index.tsx           # Landing page with feature modals
 │   ├── Dashboard.tsx       # Command center
 │   ├── RoutesPage.tsx      # AI route optimization (7 route cards)
 │   ├── ShadowPath.tsx      # Thermal comfort navigation
 │   ├── AirSense.tsx        # Air quality intelligence
 │   ├── SafePath.tsx        # Women safety routing
-│   ├── VisionAssist.tsx    # Accessibility navigation
+│   ├── VisionAssist.tsx    # Voice navigation + multilingual voice assistant
 │   ├── About.tsx           # Project information
 │   └── NotFound.tsx        # 404 page
 ├── styles.css              # Global design tokens, animations & themes
-├── App.tsx                 # Router & layout shell (ThemeProvider + AuthProvider)
+├── App.tsx                 # Router & layout (ThemeProvider + RouteProvider + AuthProvider)
 └── main.tsx                # Vite entry point
 ```
 
@@ -157,6 +162,7 @@ src/
 | Supabase | Authentication + PostgreSQL database |
 | Groq SDK (Llama 3) | Conversational AI assistant |
 | Route AI Engine | Multi-factor route scoring (14 dimensions) |
+| Web Speech API | Text-to-Speech + Speech-to-Text (15 languages, zero API keys) |
 
 ### APIs (All Free — No API Keys Required for Maps)
 | API | Purpose |
@@ -195,6 +201,29 @@ The route engine generates **6 AI-scored alternatives** from a single OSRM resul
 | **AI Recommended** | Blended optimal | Weighted across all 14 factors |
 
 Each route shows **6 live factor tiles**: Sunlight Exposure, Tree Coverage, PM2.5, CCTV Density, Sidewalk Quality, and Crowd Density.
+
+---
+
+## 🎤 Voice AI Engine
+
+UrbanPulse AI includes a **fully multilingual voice system** built on the browser's native Web Speech API — **zero external API keys required**.
+
+### Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| 🗣️ **Text-to-Speech** | AI narrates navigation alerts, route recommendations, and chat responses aloud |
+| 🎙️ **Speech-to-Text** | Users speak questions in any language — transcribed and sent to Groq AI |
+| 🌐 **15 Languages** | English, Hindi, Kannada, Telugu, Tamil, Malayalam, Marathi, Bengali, Gujarati, Spanish, French, Arabic, Chinese, Japanese + Auto-detect |
+| 🧭 **VisionAssist Navigation** | Live obstacle alerts narrated aloud: "Pothole 3m ahead. Shift right." |
+| 💬 **Voice Chat** | Tap mic → speak → AI responds in text + voice |
+| 🔇 **Mute Control** | Toggle voice output on/off anytime |
+
+### Where It's Used
+
+1. **AI Assistant** (bottom-right chat bubble) — 🎤 mic button + 🌐 language picker + auto-speaks responses
+2. **VisionAssist Page** (`/visionassist`) — Full voice navigation with obstacle alerts, voice query panel, and live alert feed
+3. **Route recommendations** — Route narration for visually impaired users
 
 ---
 
