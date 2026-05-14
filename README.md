@@ -227,6 +227,47 @@ UrbanPulse AI includes a **fully multilingual voice system** built on the browse
 
 ---
 
+## 🔐 Authentication
+
+UrbanPulse AI supports **three login methods** — no phone OTP or Twilio needed:
+
+| Method | How It Works |
+|--------|-------------|
+| ✉️ **Email + Password** | Traditional signup/login with email verification |
+| 🔗 **Email OTP (Magic Link)** | Enter email → click "Send OTP" → check inbox → click link → logged in |
+| 🔵 **Google OAuth** | One-click login with Google/Gmail account |
+
+### Signup Collects
+
+| Field | Options |
+|-------|---------|
+| Full Name | Text input |
+| Email | Text input |
+| Gender | Male / Female / Prefer not to say |
+| Visually Impaired | Yes / No |
+
+### Accessibility Onboarding
+
+When a **visually impaired user** logs in:
+1. 🗣️ The app speaks: *"Welcome to UrbanPulse AI, [name]. Where are you planning to go today?"*
+2. 🎤 Voice input activates automatically
+3. 🧭 Accessibility-friendly routes are prioritized
+4. 🔊 All navigation alerts are narrated aloud
+
+### Supabase Table: `user_profiles`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID | References `auth.users(id)` |
+| `full_name` | TEXT | User's full name |
+| `email` | TEXT | User's email |
+| `gender` | TEXT | Male / Female / Prefer not to say |
+| `is_visually_impaired` | BOOLEAN | Enables VoiceAssist mode |
+| `created_at` | TIMESTAMPTZ | Auto-set |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+---
+
 ## 🚀 Setup Instructions
 
 ### Prerequisites
@@ -235,6 +276,12 @@ UrbanPulse AI includes a **fully multilingual voice system** built on the browse
 - A Supabase project (for auth & database)
 - A Groq API key (for AI assistant)
 - **No Mapbox token needed** — maps use free OpenStreetMap
+
+### Supabase Configuration
+
+1. **Enable Email OTP**: Supabase Dashboard → Authentication → Providers → Email → Enable "Magic Link"
+2. **Enable Google OAuth**: Supabase Dashboard → Authentication → Providers → Google → Add Client ID/Secret
+3. **Run Schema**: SQL Editor → paste `supabase/schema.sql` → Run
 
 ### Installation
 
@@ -267,8 +314,9 @@ VITE_GROQ_API_KEY=your_groq_api_key
 Run the SQL schema in your Supabase SQL Editor:
 ```bash
 # Located at: supabase/schema.sql
-# Creates: user_profiles, saved_routes, citizen_reports tables
-# Includes: RLS policies and auto-profile trigger
+# Creates: user_profiles (with gender + is_visually_impaired),
+#          saved_routes, citizen_reports
+# Includes: RLS policies, auto-profile trigger on signup
 ```
 
 ---
