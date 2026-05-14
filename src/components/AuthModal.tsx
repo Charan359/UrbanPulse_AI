@@ -38,7 +38,16 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          setError('Email not verified yet. Check your inbox for the verification link, then try again.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          setError('Wrong email or password. If you just signed up, verify your email first.');
+        } else {
+          throw error;
+        }
+        return;
+      }
       onClose();
       navigate('/dashboard');
     } catch (err: any) {
@@ -96,11 +105,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         password,
         options: {
           data: { full_name: fullName, gender, is_visually_impaired: isVisuallyImpaired },
+          emailRedirectTo: window.location.origin + '/dashboard',
         },
       });
       if (error) throw error;
 
-      // Create profile in user_profiles table
+      // Create profile in user_profiles table (may fail if table doesn't exist yet)
       if (data.user) {
         try {
           await upsertUserProfile(data.user.id, {
@@ -110,11 +120,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             is_visually_impaired: isVisuallyImpaired,
           });
         } catch {
-          // Profile will be created by trigger if upsert fails
+          // Table might not exist yet — profile will be created by trigger or on next login
+          console.warn('user_profiles table not found. Run supabase/schema.sql to create it.');
         }
       }
 
-      setSuccess('🎉 Registration successful! Check your email to verify your account.');
+      // Check if user was auto-confirmed (depends on Supabase settings)
+      if (data.session) {
+        // Auto-confirmed — close modal and go to dashboard
+        onClose();
+        navigate('/dashboard');
+      } else {
+        setSuccess('🎉 Registration successful! Check your email and click the verification link to activate your account. Then come back and sign in.');
+      }
     } catch (err: any) {
       setError(err.message || 'Signup failed');
     } finally {
