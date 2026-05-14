@@ -10,6 +10,7 @@ import {
   type GeocodeFeature,
 } from "@/lib/mapbox";
 import { scoreRoutes, type ScoredRoute, ROUTE_PALETTES } from "@/lib/route-ai";
+import { useActiveRoute } from "@/contexts/RouteContext";
 
 function RoutesPage() {
   const [from, setFrom] = useState<GeocodeFeature | null>(null);
@@ -19,6 +20,7 @@ function RoutesPage() {
   const [active, setActive] = useState<string>("ai");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { setActiveRoute } = useActiveRoute();
 
 
 
@@ -44,6 +46,20 @@ function RoutesPage() {
     () => routes.find(r => r.kind === active) ?? routes[0],
     [routes, active],
   );
+
+  // Sync selected route to global context so other pages can show it
+  useEffect(() => {
+    if (current && from && to) {
+      setActiveRoute({
+        from: { name: from.place_name, center: from.center },
+        to: { name: to.place_name, center: to.center },
+        coordinates: current.source.geometry.coordinates,
+        profile,
+        kind: current.kind,
+        color: current.palette.color,
+      });
+    }
+  }, [current, from, to, profile]);
 
   return (
     <div className="min-h-screen pt-24 pb-16">

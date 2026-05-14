@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Flame, Wind, Route, Shield, Eye } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useActiveRoute } from "@/contexts/RouteContext";
 
 const layers = [
   { id: "heat", label: "Heat", icon: Flame, color: "var(--neon)" },
@@ -74,8 +75,10 @@ export function SmartMap() {
   const leafletMap = useRef<L.Map | null>(null);
   const layerGroups = useRef<Record<string, L.LayerGroup>>({});
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const userRouteLayer = useRef<L.LayerGroup>(L.layerGroup());
   const [active, setActive] = useState<string[]>(["heat", "aqi", "routes"]);
   const { theme } = useTheme();
+  const { activeRoute } = useActiveRoute();
 
   const toggle = (id: string) =>
     setActive(a => a.includes(id) ? a.filter(x => x !== id) : [...a, id]);
@@ -183,6 +186,39 @@ export function SmartMap() {
       }
     });
   }, [active]);
+
+  // Draw user's active route from Route Engine
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map) return;
+    userRouteLayer.current.clearLayers();
+    if (!activeRoute) return;
+
+    const coords: [number, number][] = activeRoute.coordinates.map(
+      c => [c[1], c[0]] as [number, number]
+    );
+
+    // Glow
+    L.polyline(coords, {
+      color: activeRoute.color, weight: 12, opacity: 0.3, lineCap: "round", lineJoin: "round",
+    }).addTo(userRouteLayer.current);
+    // Crisp line
+    L.polyline(coords, {
+      color: activeRoute.color, weight: 4, opacity: 1, lineCap: "round", lineJoin: "round",
+    }).bindPopup(`<b>${activeRoute.from.name.split(',')[0]} → ${activeRoute.to.name.split(',')[0]}</b>`)
+      .addTo(userRouteLayer.current);
+
+    // Markers
+    L.marker(coords[0], { icon: pulseIcon("#00ff9f") })
+      .bindPopup(`<b>From:</b> ${activeRoute.from.name.split(',')[0]}`)
+      .addTo(userRouteLayer.current);
+    L.marker(coords[coords.length - 1], { icon: pulseIcon("#ff6b00") })
+      .bindPopup(`<b>To:</b> ${activeRoute.to.name.split(',')[0]}`)
+      .addTo(userRouteLayer.current);
+
+    if (!map.hasLayer(userRouteLayer.current)) map.addLayer(userRouteLayer.current);
+    map.fitBounds(L.latLngBounds(coords), { padding: [60, 60], maxZoom: 15 });
+  }, [activeRoute]);
 
   return (
     <div className="relative glass-strong rounded-3xl overflow-hidden h-[640px]">
