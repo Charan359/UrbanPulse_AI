@@ -2,19 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigation, Sparkles, Wind, Flame, Shield, Accessibility,
   Bot, Clock, MapPin, Eye, ChevronRight, Zap, Sun, Users,
-  Leaf, Activity, Volume2, KeyRound, ExternalLink, Loader2,
+  Leaf, Activity, Volume2, Loader2,
 } from "lucide-react";
-import { MapboxRouteMap } from "@/components/MapboxRouteMap";
+import { LeafletRouteMap } from "@/components/MapboxRouteMap";
 import {
-  geocode, directions, getMapboxToken, setMapboxToken,
+  geocode, directions, getMapboxToken,
   type GeocodeFeature,
 } from "@/lib/mapbox";
 import { scoreRoutes, type ScoredRoute, ROUTE_PALETTES } from "@/lib/route-ai";
 
 function RoutesPage() {
-  const [token, setTokenState] = useState<string>(() => getMapboxToken());
-  const [tokenInput, setTokenInput] = useState("");
-
   const [from, setFrom] = useState<GeocodeFeature | null>(null);
   const [to, setTo] = useState<GeocodeFeature | null>(null);
   const [profile, setProfile] = useState<"walking" | "driving" | "cycling">("walking");
@@ -23,11 +20,7 @@ function RoutesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const saveToken = () => {
-    if (!tokenInput.trim()) return;
-    setMapboxToken(tokenInput.trim());
-    setTokenState(tokenInput.trim());
-  };
+
 
   const findRoutes = async () => {
     setError(null);
@@ -58,19 +51,19 @@ function RoutesPage() {
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <div className="text-xs uppercase tracking-[0.3em] text-[color:var(--cyan)] mb-2 flex items-center gap-2">
-              <Sparkles className="h-3 w-3" /> AI Route Optimization · Live Mapbox
+              <Sparkles className="h-3 w-3" /> AI Route Optimization · Live OpenStreetMap
             </div>
             <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
               Real-World <span className="text-gradient">Smart Mobility</span>
             </h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              Real Mapbox geocoding & directions, layered with AI-estimated thermal, air, safety and accessibility scoring.
+              Real geocoding & directions, layered with AI-estimated thermal, air, safety and accessibility scoring.
             </p>
           </div>
           <LiveHud />
         </div>
 
-        {!token && <TokenGate value={tokenInput} onChange={setTokenInput} onSave={saveToken} />}
+
 
         {/* Search panel */}
         <div className="glass-strong rounded-3xl p-4 md:p-5 mb-6 relative overflow-hidden">
@@ -80,13 +73,11 @@ function RoutesPage() {
               icon={MapPin} color="var(--emerald)" label="From"
               placeholder="Search source location"
               value={from} onSelect={setFrom}
-              disabled={!token}
             />
             <PlaceField
               icon={Navigation} color="var(--cyan)" label="To"
               placeholder="Search destination"
               value={to} onSelect={setTo}
-              disabled={!token}
             />
             <div className="md:col-span-2">
               <select
@@ -101,7 +92,7 @@ function RoutesPage() {
             </div>
             <button
               onClick={findRoutes}
-              disabled={loading || !token || !from || !to}
+              disabled={loading || !from || !to}
               className="md:col-span-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium glow-emerald disabled:opacity-50"
               style={{ background: "var(--gradient-cool)" }}
             >
@@ -139,19 +130,10 @@ function RoutesPage() {
         {/* Map + side panel */}
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 relative h-[640px] rounded-3xl overflow-hidden glass-strong">
-            {token ? (
-              <MapboxRouteMap
-                from={from?.center} to={to?.center}
-                routes={routes} activeKind={active} onActivate={setActive}
-              />
-            ) : (
-              <div className="absolute inset-0 grid place-items-center text-center p-8">
-                <div className="space-y-2">
-                  <KeyRound className="h-8 w-8 mx-auto text-[color:var(--cyan)]" />
-                  <div className="text-sm text-muted-foreground">Add your Mapbox public token to load the live map.</div>
-                </div>
-              </div>
-            )}
+            <LeafletRouteMap
+              from={from?.center} to={to?.center}
+              routes={routes} activeKind={active} onActivate={setActive}
+            />
             {current && (
               <div className="absolute bottom-4 left-4 glass rounded-2xl px-4 py-3 text-xs flex items-center gap-3">
                 <span className="h-2.5 w-2.5 rounded-full animate-glow-pulse"
@@ -241,39 +223,8 @@ export default RoutesPage;
 
 /* --- Sub-components --- */
 
-function TokenGate({ value, onChange, onSave }: { value: string; onChange: (s: string) => void; onSave: () => void }) {
-  return (
-    <div className="glass-strong rounded-3xl p-5 mb-6 border border-[color:var(--cyan)]/30">
-      <div className="flex items-start gap-3">
-        <KeyRound className="h-5 w-5 text-[color:var(--cyan)] mt-1" />
-        <div className="flex-1">
-          <div className="font-medium">Connect Mapbox</div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Paste your Mapbox <span className="text-foreground">public</span> token to enable live geocoding & directions.
-            Get one at{" "}
-            <a className="text-[color:var(--cyan)] inline-flex items-center gap-1" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noreferrer">
-              account.mapbox.com <ExternalLink className="h-3 w-3" />
-            </a>
-            . Stored locally in your browser.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              value={value}
-              onChange={e => onChange(e.target.value)}
-              placeholder="pk.eyJ1Ijoi..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[color:var(--cyan)]/40"
-            />
-            <button onClick={onSave}
-              className="rounded-xl px-4 py-2 text-sm font-medium glow-cyan"
-              style={{ background: "var(--gradient-cool)" }}>
-              Connect
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+
+
 
 function PlaceField({
   icon: Icon, color, label, placeholder, value, onSelect, disabled,
@@ -419,7 +370,7 @@ function LiveHud() {
         <span className="h-2 w-2 rounded-full bg-[color:var(--emerald)] animate-glow-pulse"/> AI ONLINE
       </span>
       <span className="text-muted-foreground">·</span>
-      <span><Clock className="inline h-3 w-3 mr-1" />Live · Mapbox</span>
+      <span><Clock className="inline h-3 w-3 mr-1" />Live · OpenStreetMap</span>
     </div>
   );
 }

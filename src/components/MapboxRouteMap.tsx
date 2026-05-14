@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { getMapboxToken } from "@/lib/mapbox";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import type { ScoredRoute } from "@/lib/route-ai";
 
 interface Props {
@@ -12,128 +11,126 @@ interface Props {
   onActivate?: (kind: string) => void;
 }
 
-export function MapboxRouteMap({ from, to, routes, activeKind, onActivate }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
+function pulseIcon(color: string, size = 14) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width:${size}px; height:${size}px; border-radius:50%;
+      background:${color}; box-shadow: 0 0 12px ${color};
+    "></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
+export function LeafletRouteMap({ from, to, routes, activeKind, onActivate }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const routeLayerRef = useRef<L.LayerGroup>(L.layerGroup());
+  const markerLayerRef = useRef<L.LayerGroup>(L.layerGroup());
+
+  // Initialize map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const token = getMapboxToken();
-    if (!token) return;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
-      container: containerRef.current,
-      style: "mapbox://styles/mapbox/dark-v11",
-      center: from ?? [77.5946, 12.9716],
-      zoom: 12,
-      pitch: 45,
-      bearing: -10,
+
+    const map = L.map(containerRef.current, {
+      center: [12.9716, 77.5946], // Bengaluru
+      zoom: 13,
+      zoomControl: false,
       attributionControl: false,
     });
-    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
-    map.on("load", () => {
-      // 3D buildings for the cyberpunk feel
-      const layers = map.getStyle().layers ?? [];
-      const labelLayer = layers.find(l => l.type === "symbol" && (l.layout as any)?.["text-field"]);
-      map.addLayer({
-        id: "3d-buildings",
-        source: "composite",
-        "source-layer": "building",
-        filter: ["==", "extrude", "true"],
-        type: "fill-extrusion",
-        minzoom: 13,
-        paint: {
-          "fill-extrusion-color": "#0c1a2e",
-          "fill-extrusion-height": ["get", "height"],
-          "fill-extrusion-base": ["get", "min_height"],
-          "fill-extrusion-opacity": 0.7,
-        },
-      }, labelLayer?.id);
-    });
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 19,
+    }).addTo(map);
+
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.control.attribution({ position: "bottomright" }).addTo(map);
+
+    routeLayerRef.current.addTo(map);
+    markerLayerRef.current.addTo(map);
+
     mapRef.current = map;
     return () => { map.remove(); mapRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Render routes
+  // Draw routes and markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const apply = () => {
-      // remove old route layers/sources
-      const existing = map.getStyle()?.layers ?? [];
-      existing.forEach(l => {
-        if (l.id.startsWith("route-")) map.removeLayer(l.id);
-      });
-      Object.keys(map.getStyle()?.sources ?? {}).forEach(id => {
-        if (id.startsWith("route-")) map.removeSource(id);
-      });
-      // markers
-      markersRef.current.forEach(m => m.remove());
-      markersRef.current = [];
 
-      if (from) markersRef.current.push(
-        new mapboxgl.Marker({ color: "#00ff9f" }).setLngLat(from).addTo(map)
+    routeLayerRef.current.clearLayers();
+    markerLayerRef.current.clearLayers();
+
+    // Origin / destination markers
+    if (from) {
+      L.marker([from[1], from[0]], { icon: pulseIcon("#00ff9f", 16) })
+        .bindPopup("<b>Origin</b>")
+        .addTo(markerLayerRef.current);
+    }
+    if (to) {
+      L.marker([to[1], to[0]], { icon: pulseIcon("#ff6b00", 16) })
+        .bindPopup("<b>Destination</b>")
+        .addTo(markerLayerRef.current);
+    }
+
+    // Draw routes - inactive first, active last (on top)
+    const ordered = [...routes].sort((a, b) =>
+      a.kind === activeKind ? 1 : b.kind === activeKind ? -1 : 0
+    );
+
+    ordered.forEach((r) => {
+      const isActive = r.kind === activeKind;
+      const coords: [number, number][] = r.source.geometry.coordinates.map(
+        (c: number[]) => [c[1], c[0]] as [number, number]
       );
-      if (to) markersRef.current.push(
-        new mapboxgl.Marker({ color: "#ff6b00" }).setLngLat(to).addTo(map)
-      );
 
-      // draw each route, active on top
-      const ordered = [...routes].sort((a, b) =>
-        a.kind === activeKind ? 1 : b.kind === activeKind ? -1 : 0
-      );
+      // Glow layer (wider, blurred)
+      L.polyline(coords, {
+        color: r.palette.color,
+        weight: isActive ? 14 : 8,
+        opacity: isActive ? 0.35 : 0.15,
+        lineCap: "round",
+        lineJoin: "round",
+      }).addTo(routeLayerRef.current);
 
-      ordered.forEach((r) => {
-        const id = `route-${r.kind}`;
-        map.addSource(id, {
-          type: "geojson",
-          data: { type: "Feature", properties: {}, geometry: r.source.geometry as any },
-        });
-        const isActive = r.kind === activeKind;
-        // glow halo
-        map.addLayer({
-          id: `${id}-glow`, type: "line", source: id,
-          paint: {
-            "line-color": r.palette.color,
-            "line-width": isActive ? 14 : 8,
-            "line-blur": isActive ? 10 : 6,
-            "line-opacity": isActive ? 0.55 : 0.25,
-          },
-          layout: { "line-cap": "round", "line-join": "round" },
-        });
-        // crisp line
-        map.addLayer({
-          id, type: "line", source: id,
-          paint: {
-            "line-color": r.palette.color,
-            "line-width": isActive ? 5 : 3,
-            "line-opacity": isActive ? 1 : 0.7,
-          },
-          layout: { "line-cap": "round", "line-join": "round" },
-        });
+      // Crisp line
+      const line = L.polyline(coords, {
+        color: r.palette.color,
+        weight: isActive ? 5 : 3,
+        opacity: isActive ? 1 : 0.6,
+        lineCap: "round",
+        lineJoin: "round",
+      })
+        .bindPopup(`<b>${r.palette.name}</b><br/>${r.distanceKm} km · ${r.etaMin} min`)
+        .addTo(routeLayerRef.current);
 
-        if (onActivate) {
-          map.on("click", id, () => onActivate(r.kind));
-          map.on("mouseenter", id, () => (map.getCanvas().style.cursor = "pointer"));
-          map.on("mouseleave", id, () => (map.getCanvas().style.cursor = ""));
-        }
-      });
-
-      // fit bounds
-      if (routes.length) {
-        const bounds = new mapboxgl.LngLatBounds();
-        routes.forEach(r => r.source.geometry.coordinates.forEach(c => bounds.extend(c as [number, number])));
-        map.fitBounds(bounds, { padding: 80, duration: 1200, pitch: 45 });
-      } else if (from && to) {
-        map.fitBounds(new mapboxgl.LngLatBounds(from, to), { padding: 80, duration: 1000 });
-      } else if (from) {
-        map.flyTo({ center: from, zoom: 13, duration: 1000 });
+      if (onActivate) {
+        line.on("click", () => onActivate(r.kind));
       }
-    };
-    if (map.isStyleLoaded()) apply();
-    else map.once("load", apply);
+    });
+
+    // Fit bounds
+    if (routes.length) {
+      const allCoords: [number, number][] = [];
+      routes.forEach(r =>
+        r.source.geometry.coordinates.forEach((c: number[]) =>
+          allCoords.push([c[1], c[0]])
+        )
+      );
+      if (allCoords.length) {
+        map.fitBounds(L.latLngBounds(allCoords), { padding: [60, 60], maxZoom: 16 });
+      }
+    } else if (from && to) {
+      map.fitBounds(
+        L.latLngBounds([[from[1], from[0]], [to[1], to[0]]]),
+        { padding: [60, 60], maxZoom: 15 }
+      );
+    } else if (from) {
+      map.setView([from[1], from[0]], 14);
+    }
   }, [routes, activeKind, from, to, onActivate]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
