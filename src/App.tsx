@@ -6,6 +6,9 @@ import { Assistant } from "@/components/Assistant";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { RouteProvider } from "@/contexts/RouteContext";
+import { VoiceAssistProvider } from "@/components/VoiceAssistProvider";
+import { VoiceCommandButton } from "@/components/VoiceCommandButton";
+import { VoiceOnboarding } from "@/components/VoiceOnboarding";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages for code-splitting
@@ -35,6 +38,7 @@ function App() {
     <ThemeProvider>
     <RouteProvider>
     <AuthProvider>
+    <VoiceAssistProvider>
       <Navbar />
       <main className="min-h-screen">
         <Suspense fallback={<PageLoader />}>
@@ -53,6 +57,9 @@ function App() {
       </main>
       <Footer />
       <Assistant />
+      <VoiceCommandButton />
+      <VoiceOnboarding />
+    </VoiceAssistProvider>
     </AuthProvider>
     </RouteProvider>
     </ThemeProvider>
