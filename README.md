@@ -44,6 +44,8 @@ A modular, AI-powered **Smart City Operating System** that:
 6. Generates **6 AI-scored route alternatives** per search with multi-factor comparison.
 7. Supports **dark & light themes** across the entire app including maps.
 8. **Voice AI** — speaks navigation alerts aloud and accepts voice commands in **15 languages**.
+9. **Voice-First Accessibility** — entire website becomes voice-interactive for visually impaired users.
+10. **3 login methods** — Email+Password, Email OTP magic link, Google OAuth (no phone/Twilio).
 
 ---
 
@@ -56,12 +58,14 @@ A modular, AI-powered **Smart City Operating System** that:
 | 3 | **SafePath Guardian AI** | CCTV, lighting, and incident-aware women safety navigation |
 | 4 | **AirSense AI** | AQI-optimized routing with PM2.5, NO₂, and CO₂ predictions |
 | 5 | **VisionAssist AI** | Voice-navigated obstacle detection + multilingual voice assistant (15 languages) |
-| 6 | **AI Smart City Assistant** | Voice-enabled conversational AI powered by Groq (Llama 3) with TTS/STT |
+| 6 | **AI Smart City Assistant** | Voice-enabled conversational AI powered by Groq (Llama 3.1) with TTS/STT |
 | 7 | **Smart City Dashboard** | Real-time command center with sensor fusion and analytics |
 | 8 | **AI Route Optimization** | Multi-factor route scoring (thermal + AQI + safety + accessibility) |
 | 9 | **Interactive Leaflet Map** | Live OpenStreetMap with heat zones, AQI overlays, and route visualization |
 | 10 | **Dark/Light Theme** | Full theme system with theme-aware maps (CARTO dark/light tiles) |
 | 11 | **Voice AI Engine** | Multilingual TTS/STT using Web Speech API — 15 languages, zero API keys |
+| 12 | **Voice-First Accessibility** | Full website talkback, voice commands, destination understanding for visually impaired |
+| 13 | **Secure Auth System** | Email+Password, Email OTP, Google OAuth — no phone/Twilio |
 
 ---
 
@@ -92,7 +96,7 @@ A modular, AI-powered **Smart City Operating System** that:
 │  Frontend   │   AI Layer  │      Data Layer          │
 │             │             │                          │
 │ React 19    │ Groq SDK    │ Supabase (Auth + DB)     │
-│ Tailwind v4 │ Llama 3     │ Leaflet + OpenStreetMap  │
+│ Tailwind v4 │ Llama 3.1   │ Leaflet + OpenStreetMap  │
 │ Glassmorphism│ Route AI   │ Photon Geocoder (OSM)    │
 │ OKLCH Colors│ Score Engine│ OSRM Routing (OSM)       │
 │ Theme System│ Voice AI    │ Web Speech API (TTS/STT) │
@@ -412,9 +416,11 @@ This project targets the following impact areas:
 - ✅ **Climate Resilience** — Urban heat mapping and cooling corridor identification
 - ✅ **Public Health** — AQI-aware routing for respiratory safety
 - ✅ **Women Safety** — AI-powered safe navigation with real-time risk scoring
-- ✅ **Accessibility** — Voice-navigated obstacle detection for visually impaired
+- ✅ **Accessibility** — Voice-first mode: entire website speaks to visually impaired users
 - ✅ **Sustainability** — Green mobility and walkability optimization
 - ✅ **Social Impact** — Human-centered design for inclusive smart cities
+- ✅ **Multilingual** — 15 languages supported for voice input/output
+- ✅ **Privacy** — No voice recordings stored, mic permission with clear consent
 
 ---
 
