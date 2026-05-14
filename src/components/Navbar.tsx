@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 import { Activity, Menu, X, User as UserIcon, LogOut, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,12 @@ export function Navbar() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <header className="fixed top-0 inset-x-0 z-50">
@@ -75,8 +81,8 @@ export function Navbar() {
             
             {user ? (
               <button
-                onClick={() => signOut()}
-                className="hidden sm:inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium glass hover:bg-white/5 transition"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium glass hover:bg-white/5 transition"
                 title="Sign Out"
               >
                 <LogOut className="h-4 w-4" />
@@ -85,7 +91,7 @@ export function Navbar() {
             ) : (
               <button
                 onClick={() => setIsAuthOpen(true)}
-                className="hidden sm:inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium glass hover:bg-white/5 transition"
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium glass hover:bg-white/5 transition"
               >
                 <UserIcon className="h-4 w-4" />
                 Connect
@@ -114,6 +120,17 @@ export function Navbar() {
                 {l.label}
               </Link>
             ))}
+            {user ? (
+              <button onClick={() => { handleLogout(); setOpen(false); }}
+                className="px-4 py-3 rounded-lg text-sm hover:bg-white/5 text-left flex items-center gap-2 text-[color:var(--destructive)]">
+                <LogOut className="h-4 w-4" /> Sign Out ({user.email?.split('@')[0]})
+              </button>
+            ) : (
+              <button onClick={() => { setIsAuthOpen(true); setOpen(false); }}
+                className="px-4 py-3 rounded-lg text-sm hover:bg-white/5 text-left flex items-center gap-2">
+                <UserIcon className="h-4 w-4" /> Sign In
+              </button>
+            )}
           </div>
         )}
       </div>
