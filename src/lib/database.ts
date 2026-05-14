@@ -1,5 +1,67 @@
 import { supabase } from './supabase';
 
+// ─── User Profile ───
+export interface UserProfile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  gender: string | null;
+  is_visually_impaired: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Get user profile ───
+export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) return null;
+  return data;
+}
+
+// ─── Create or update user profile ───
+export async function upsertUserProfile(userId: string, updates: {
+  full_name?: string;
+  email?: string;
+  gender?: string;
+  is_visually_impaired?: boolean;
+}) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .upsert({
+      id: userId,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserProfile;
+}
+
+// ─── Update user profile ───
+export async function updateUserProfile(userId: string, updates: {
+  full_name?: string;
+  email?: string;
+  gender?: string;
+  is_visually_impaired?: boolean;
+}) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as UserProfile;
+}
+
 // ─── Save a route ───
 export async function saveRoute(
   userId: string,
@@ -67,29 +129,4 @@ export async function getReports() {
 
   if (error) throw error;
   return data ?? [];
-}
-
-// ─── Get user profile ───
-export async function getUserProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// ─── Update user profile ───
-export async function updateUserProfile(userId: string, updates: { full_name?: string; avatar_url?: string }) {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .update(updates)
-    .eq('id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
 }
