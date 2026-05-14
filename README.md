@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Supabase-Auth%20%26%20DB-3FCF8E?style=flat-square&logo=supabase" alt="Supabase"/>
   <img src="https://img.shields.io/badge/Groq-LLM-F55036?style=flat-square" alt="Groq"/>
-  <img src="https://img.shields.io/badge/Mapbox-GL-000?style=flat-square&logo=mapbox" alt="Mapbox"/>
+  <img src="https://img.shields.io/badge/Leaflet-OpenStreetMap-199900?style=flat-square&logo=leaflet" alt="Leaflet"/>
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License"/>
 </p>
 
@@ -41,6 +41,8 @@ A modular, AI-powered **Smart City Operating System** that:
 3. Calculates women safety indices using CCTV density, lighting, foot traffic, and incident data.
 4. Provides voice-navigated obstacle detection for visually impaired pedestrians.
 5. Offers an AI assistant (powered by Groq LLM) for instant climate and urban planning queries.
+6. Generates **6 AI-scored route alternatives** per search with multi-factor comparison.
+7. Supports **dark & light themes** across the entire app including maps.
 
 ---
 
@@ -56,8 +58,8 @@ A modular, AI-powered **Smart City Operating System** that:
 | 6 | **AI Smart City Assistant** | Conversational AI powered by Groq (Llama 3) for urban queries |
 | 7 | **Smart City Dashboard** | Real-time command center with sensor fusion and analytics |
 | 8 | **AI Route Optimization** | Multi-factor route scoring (thermal + AQI + safety + accessibility) |
-| 9 | **Climate Risk Prediction** | Forecasting urban heat events and pollution spikes |
-| 10 | **Generative Urbanism** | AI-powered before/after city redesign visualizations |
+| 9 | **Interactive Leaflet Map** | Live OpenStreetMap with heat zones, AQI overlays, and route visualization |
+| 10 | **Dark/Light Theme** | Full theme system with theme-aware maps (CARTO dark/light tiles) |
 
 ---
 
@@ -67,11 +69,12 @@ A modular, AI-powered **Smart City Operating System** that:
 - 📈 **AI Heat Dashboard** — Live thermal metrics and heat forecasts
 - 🌬️ **AQI Dashboard** — Air quality intelligence and sensor readings
 - ♻️ **Sustainability Analytics** — Climate resilience and walkability scores
-- 🗺️ **Interactive Heatmap** — Mapbox GL with toggleable data overlays
+- 🗺️ **Interactive Leaflet Map** — OpenStreetMap with toggleable data overlays (heat, AQI, routes, safety, accessibility)
 - 🌑 **ShadowPath Navigation** — Sun-aware cool-path finder
 - 🛡️ **Women Safety Dashboard** — Safety index with CCTV and lighting data
 - ♿ **Accessibility Mode** — VisionAssist navigation interface
 - 🤖 **AI Chat Assistant** — Real-time conversational AI (Groq-powered)
+- 🛣️ **AI Route Engine** — 6-way route comparison with live factor tiles
 - ℹ️ **About Project** — Architecture, mission, and team
 
 ---
@@ -86,10 +89,10 @@ A modular, AI-powered **Smart City Operating System** that:
 │  Frontend   │   AI Layer  │      Data Layer          │
 │             │             │                          │
 │ React 19    │ Groq SDK    │ Supabase (Auth + DB)     │
-│ Tailwind v4 │ Llama 3     │ Mapbox GL JS             │
-│ Glassmorphism│ Route AI   │ OpenWeather API           │
-│ OKLCH Colors│ Score Engine│ AQI Sensor APIs           │
-│ Framer Motion│            │ Geolocation               │
+│ Tailwind v4 │ Llama 3     │ Leaflet + OpenStreetMap  │
+│ Glassmorphism│ Route AI   │ Photon Geocoder (OSM)    │
+│ OKLCH Colors│ Score Engine│ OSRM Routing (OSM)       │
+│ Theme System│            │ Geolocation               │
 └─────────────┴─────────────┴─────────────────────────┘
 ```
 
@@ -97,35 +100,39 @@ A modular, AI-powered **Smart City Operating System** that:
 src/
 ├── components/          # Reusable UI components
 │   ├── ui/              # Shadcn UI primitives (46 components)
-│   ├── Navbar.tsx        # Navigation with auth integration
+│   ├── Navbar.tsx        # Navigation with auth + theme toggle
 │   ├── Hero.tsx          # Animated landing hero
-│   ├── SmartMap.tsx       # Mapbox interactive map
+│   ├── SmartMap.tsx       # Leaflet interactive map with overlays
+│   ├── MapboxRouteMap.tsx # Leaflet route visualization map
 │   ├── Assistant.tsx      # Groq AI chat widget
 │   ├── AuthModal.tsx      # Supabase login/signup overlay
+│   ├── ProtectedRoute.tsx # Auth-gated route wrapper
 │   ├── FeaturePage.tsx    # Reusable feature page template
 │   └── MetricCard.tsx     # Glowing dashboard metric cards
 ├── contexts/
-│   └── AuthContext.tsx    # Supabase auth state provider
+│   ├── AuthContext.tsx    # Supabase auth state provider
+│   └── ThemeContext.tsx   # Dark/light theme provider
 ├── hooks/
 │   └── use-mobile.tsx     # Responsive breakpoint hook
 ├── lib/
 │   ├── supabase.ts        # Supabase client
 │   ├── groq.ts            # Groq AI client
-│   ├── mapbox.ts          # Mapbox geocoding & directions
-│   ├── route-ai.ts        # AI route scoring engine
+│   ├── mapbox.ts          # Photon geocoding & OSRM routing (free OSM)
+│   ├── route-ai.ts        # AI route scoring engine (6-way comparison)
+│   ├── database.ts        # Supabase CRUD helpers
 │   └── utils.ts           # Tailwind merge utility
 ├── pages/
 │   ├── Index.tsx           # Landing page
 │   ├── Dashboard.tsx       # Command center
-│   ├── RoutesPage.tsx      # AI route optimization
+│   ├── RoutesPage.tsx      # AI route optimization (7 route cards)
 │   ├── ShadowPath.tsx      # Thermal comfort navigation
 │   ├── AirSense.tsx        # Air quality intelligence
 │   ├── SafePath.tsx        # Women safety routing
 │   ├── VisionAssist.tsx    # Accessibility navigation
 │   ├── About.tsx           # Project information
 │   └── NotFound.tsx        # 404 page
-├── styles.css              # Global design tokens & animations
-├── App.tsx                 # Router & layout shell
+├── styles.css              # Global design tokens, animations & themes
+├── App.tsx                 # Router & layout shell (ThemeProvider + AuthProvider)
 └── main.tsx                # Vite entry point
 ```
 
@@ -140,7 +147,7 @@ src/
 | TypeScript 5.8 | Type safety |
 | Tailwind CSS v4 | Utility-first styling |
 | Shadcn/UI + Radix | Accessible component library |
-| Mapbox GL JS | Interactive 3D maps |
+| Leaflet + OpenStreetMap | Interactive maps (CARTO dark/light tiles) |
 | Recharts | Data visualization |
 | Lucide Icons | Icon system |
 
@@ -149,25 +156,45 @@ src/
 |-----------|---------|
 | Supabase | Authentication + PostgreSQL database |
 | Groq SDK (Llama 3) | Conversational AI assistant |
-| Route AI Engine | Multi-factor route scoring algorithm |
+| Route AI Engine | Multi-factor route scoring (14 dimensions) |
 
-### APIs
+### APIs (All Free — No API Keys Required for Maps)
 | API | Purpose |
 |-----|---------|
-| Mapbox Geocoding | Location search |
-| Mapbox Directions | Route generation |
-| OpenWeather | Temperature & weather data |
-| AQI APIs | Air quality sensor data |
+| Photon (Komoot) | Geocoding — free OSM search, no auth |
+| OSRM | Routing — free OSM directions with alternatives |
+| OpenStreetMap | Base map tiles via CARTO (dark & light) |
+| Supabase | Auth + database (requires project key) |
+| Groq | AI chat (requires API key) |
 
 ---
 
 ## 🎨 Design System
 
-- **Theme**: Cyberpunk smart-city aesthetic with dark mode
-- **Colors**: OKLCH color space with neon orange, cyan, emerald, violet accents
-- **Effects**: Glassmorphism, glow effects, animated gradients
+- **Theme**: Dual-mode — Cyberpunk dark + Clean light, toggled via Navbar ☀️/🌙
+- **Colors**: OKLCH color space with neon orange, cyan, emerald, violet accents (adapted per theme)
+- **Effects**: Glassmorphism (frosted dark/white panels), glow effects, animated gradients
 - **Typography**: Space Grotesk (headings), JetBrains Mono (data), Inter (body)
 - **Animations**: Pulse rings, scan lines, gradient shifts, smooth transitions
+- **Maps**: CARTO tiles switch automatically between `dark_all` and `light_all`
+
+---
+
+## 🛣️ Route AI Engine
+
+The route engine generates **6 AI-scored alternatives** from a single OSRM result:
+
+| Route | Optimizes For | Key Metrics |
+|-------|--------------|-------------|
+| **Shortest** | Fastest path | High heat/AQI exposure |
+| **Coolest** | Low thermal exposure | Tree cover 78%+, heat ≤32°C |
+| **Clean-Air** | Lowest PM2.5/AQI | AQI ≤55, avoids industrial zones |
+| **Women-Safe** | CCTV + crowd density | Safety 89%+, CCTV 85%+ |
+| **Accessibility** | Sidewalk quality | Sidewalk score 88%+, ramp access |
+| **Safest** | Overall safety score | Safety 93%+, CCTV 82%+ |
+| **AI Recommended** | Blended optimal | Weighted across all 14 factors |
+
+Each route shows **6 live factor tiles**: Sunlight Exposure, Tree Coverage, PM2.5, CCTV Density, Sidewalk Quality, and Crowd Density.
 
 ---
 
@@ -176,9 +203,9 @@ src/
 ### Prerequisites
 - Node.js 18+
 - npm 9+
-- A Supabase project
-- A Groq API key
-- A Mapbox public token (optional, for live maps)
+- A Supabase project (for auth & database)
+- A Groq API key (for AI assistant)
+- **No Mapbox token needed** — maps use free OpenStreetMap
 
 ### Installation
 
@@ -204,7 +231,6 @@ npm run dev
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_GROQ_API_KEY=your_groq_api_key
-VITE_MAPBOX_TOKEN=your_mapbox_public_token
 ```
 
 ### Database Setup
